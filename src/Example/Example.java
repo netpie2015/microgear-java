@@ -4,9 +4,9 @@ import Microgear.Microgear;
 import Microgear.Microgear.*;
 
 public class Example {
-	final static String appID = "appID";
-	final static String Key = "Key";
-	final static String Secret = "Secret";
+	final static String appID = "APPID";
+	final static String Key = "KEY";
+	final static String Secret = "SECRET";
 
 	public static void main(String[] args) throws InterruptedException {
 		Microgear microgear = new Microgear();
@@ -15,7 +15,6 @@ public class Example {
 			@Override
 			public void OnConnectArrived(Boolean c) {
 				if (c) {
-					System.out.println(c);
 					System.out.println("Microgear is Connected.");
 				}
 
@@ -35,7 +34,7 @@ public class Example {
 
 			@Override
 			public void OnPresentArrived(String a) {
-				System.err.println("Present "+a);
+				System.out.println("Present "+a);
 
 			}
 		});
@@ -67,10 +66,11 @@ public class Example {
 		});
 		
 		microgear.connect(appID, Key, Secret);
-		microgear.Subscribe("/Topictest");
+		microgear.Setalias("test");
+		microgear.Subscribe("Topictest");
 		int count = 1;
 		for(;;){
-			microgear.Publish("/Topictest", String.valueOf(count)+".  Test message");
+			microgear.Publish("Topictest", String.valueOf(count)+".  Test message");
 			count++;
 			Thread.sleep(2000);
 		}

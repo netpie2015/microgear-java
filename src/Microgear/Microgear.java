@@ -60,7 +60,7 @@ public class Microgear implements MqttCallback {
 	private static Vector<String> vec_subscribe = new Vector<String>();
 	private static List<String> republish_topic = new ArrayList<String>();
 	private static List<String> republish_message = new ArrayList<String>();
-	private static String vec_setalias;
+	private static String vec_setalias ;
 	private static String status = "0";
 
 	private final String broker = "tcp://gb.netpie.io:1883";
@@ -264,6 +264,8 @@ public class Microgear implements MqttCallback {
 			connOpts.setMqttVersion(3);
 			connOpts.setPassword(mqttpassword.toCharArray());
 			mqtt.connect(connOpts);
+			mqtt.subscribe("/" + appid + "/" + "&present");
+			mqtt.subscribe("/" + appid + "/" + "&absent");
 			Resubscribe();
 		} catch (InvalidKeyException e) {
 		} catch (MqttException e) {
@@ -292,9 +294,6 @@ public class Microgear implements MqttCallback {
 			ConnectListener.OnConnectArrived(true);
 		} catch (Exception e1) {
 		}
-
-		Subscribe("&present");// subscribe client connect
-		Subscribe("&absent");// subscribe client disconnect
 
 		if (vec_setalias != null) {
 			Setalias(vec_setalias);
@@ -403,7 +402,7 @@ public class Microgear implements MqttCallback {
                 return Topic;
             }
         } else {
-        	System.err.println("Error: name must be A-Z,a-z,0-9,_,& and must not spaces. ");
+        	System.err.println("Error: name must be A-Z,a-z,0-9,_,& and must not spaces.");
 			System.exit(0);
 			return null;
         }
