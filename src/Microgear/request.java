@@ -1,4 +1,4 @@
-package Microgear;
+package microgear;
 
 import java.io.BufferedReader;
 import java.io.InputStream;
@@ -25,6 +25,7 @@ public class request {
 	final static String Method = "POST";
 	final static String Request_url = "http://ga.netpie.io:8080/api/rtoken";
 	public JSONObject token_token_secret = new JSONObject();
+	//private EventListener eventListener = new EventListener();
 
 	public String OAuth(String Key, String Secret, String authorize_callback) throws Exception {
 		String Header = Sinature(Key, Secret, authorize_callback);
@@ -52,7 +53,8 @@ public class request {
 			Microgear.setStatus("0");
 			return token_token_secret.toString();
 		} catch (Exception e) {
-			Microgear.ErrorListener.OnErrorArrived("Please check Appid,Key,Secret. ");
+			//eventListener.mError.onError("Please check Appid,Key,Secret. ");
+			//Microgear.ErrorListener.OnErrorArrived("Please check Appid,Key,Secret. ");
 			System.exit(0);
 		}
 		return null;

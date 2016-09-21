@@ -1,4 +1,4 @@
-package Microgear;
+package microgear;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -30,6 +30,7 @@ import org.eclipse.paho.client.mqttv3.MqttClient;
 import org.eclipse.paho.client.mqttv3.MqttConnectOptions;
 import org.eclipse.paho.client.mqttv3.MqttException;
 import org.eclipse.paho.client.mqttv3.MqttMessage;
+import org.eclipse.paho.client.mqttv3.MqttPersistenceException;
 import org.eclipse.paho.client.mqttv3.persist.MemoryPersistence;
 
 import org.json.JSONException;
@@ -60,33 +61,76 @@ public class Microgear implements MqttCallback {
 	private static Vector<String> vec_subscribe = new Vector<String>();
 	private static List<String> republish_topic = new ArrayList<String>();
 	private static List<String> republish_message = new ArrayList<String>();
-	private static String vec_setalias ;
+	private static String vec_setalias;
 	private static String status = "0";
 
 	private final String broker = "tcp://gb.netpie.io:1883";
 	private final String resettoken_url = "http://ga.netpie.io:8080/api/revoke/";
 	private final String endpoint = "pie://gb.netpie.io:1883";
-	private final String dir = "microgear.cache";
-	OnMessage MessageListener;
-	OnConnect ConnectListener;
-	OnDisconnect DisConnectListener;
-	OnPresent PresentListener;
-	OnAbsent AbsentListener;
-
-	public static OnError ErrorListener;
+	private final String dir = "src/microgear.cache";
 
 	private boolean status_vac = true;
+	private int qos = 0;
 
-	public static void main(String[] args) {
+	private MicrogearEventListener EventListener;
+
+	private class Publisher extends Thread {
+		MqttClient mqtt ;
+		String Topic ;
+		MqttMessage Message ;
+		boolean Retainde = false;
+		public void run(){  
+			if(Retainde){
+				try {
+					mqtt.publish(this.Topic, this.Message.getPayload(), 0, Retainde);
+				} catch (MqttPersistenceException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				} catch (MqttException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
+			}
+			else{
+				try {
+					this.mqtt.publish(this.Topic, this.Message);
+				} catch (MqttPersistenceException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				} catch (MqttException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
+			}
+		}  
+		
+		public Publisher(MqttClient mqtt,String topic,MqttMessage message,boolean retainde){
+			this.mqtt = mqtt;
+			this.Topic = topic;
+			this.Message = message;
+			this.Retainde = retainde; 
+		}
+		public Publisher(MqttClient mqtt,String topic,MqttMessage message){
+			this.mqtt = mqtt;
+			this.Topic = topic;
+			this.Message = message;
+		}
+	}
+
+	public void setCallback(MicrogearEventListener EventListener) {
+		this.EventListener = EventListener;
+	}
+	
+	public void connect(String input_appID, String input_Key, String input_Secret, String alias) {
+		connect(input_appID,input_Key,input_Secret);
+		Setalias(alias);
 	}
 
 	public void connect(String input_appID, String input_Key, String input_Secret) {
-
 		appid = input_appID;// save variables
 		key = input_Key;
 		secret = input_Secret;
 		authorize_callback = "scope=&appid=" + appid + "&mgrev=JVM1a&verifier=JVM1a";
-
 		GetItem();// get microgear.cache
 	}
 
@@ -260,7 +304,7 @@ public class Microgear implements MqttCallback {
 			MqttConnectOptions connOpts = new MqttConnectOptions();
 			connOpts.setCleanSession(true);
 			connOpts.setUserName(mqttuser);
-			connOpts.setKeepAliveInterval(10);
+			connOpts.setKeepAliveInterval(15);
 			connOpts.setMqttVersion(3);
 			connOpts.setPassword(mqttpassword.toCharArray());
 			mqtt.connect(connOpts);
@@ -271,16 +315,17 @@ public class Microgear implements MqttCallback {
 		} catch (MqttException e) {
 			if (e.getReasonCode() == 4) {// App ID or App secret invalid
 				setStatus("0");
-				ErrorListener.OnErrorArrived(e.getMessage());
+				EventListener.onError(e.getMessage());
 				Build_microgear();
 				Reconnect();
 			} else if (e.getReasonCode() == 5) {// App ID or App secret invalid
-				ErrorListener.OnErrorArrived("Error: Thing disable.");
+				EventListener.onError("Error: Thing disable.");
+
 				Thread.sleep(2000);
 				Reconnect();
 			} else {
 				// connection lost
-				ErrorListener.OnErrorArrived("Error: Please check your internet.");
+				EventListener.onError("Error: Please check your internet.");
 				Thread.sleep(2000);
 				Reconnect();
 			}
@@ -291,7 +336,7 @@ public class Microgear implements MqttCallback {
 		status_vac = false;// set error for dont save subscribe
 		try {
 			new request().OAuth(key, secret, authorize_callback);
-			ConnectListener.OnConnectArrived(true);
+			EventListener.onConnet();
 		} catch (Exception e1) {
 		}
 
@@ -302,13 +347,13 @@ public class Microgear implements MqttCallback {
 			Subscribe(vec_subscribe.get(i));
 		}
 		for (int i = 0; i < republish_topic.size(); i++) {
-			try {
-				MqttMessage message = new MqttMessage();
-				message.setPayload(republish_message.get(i).getBytes());
-				if (Checktopic(republish_topic.get(i))!=null) {
-					mqtt.publish(republish_topic.get(i), message);
-				}
-			} catch (MqttException e) {
+			MqttMessage message = new MqttMessage();
+			message.setQos(qos);
+			message.setPayload(republish_message.get(i).getBytes());
+			if (Checktopic(republish_topic.get(i)) != null) {
+				Publisher publisher = new Publisher(mqtt,republish_topic.get(i),message);
+				Thread PublishThread =new Thread(publisher);  
+				PublishThread.start(); 
 			}
 
 		}
@@ -375,45 +420,45 @@ public class Microgear implements MqttCallback {
 	public void Disconnect() {
 		try {
 			mqtt.disconnect();
-			DisConnectListener.OnDisconnectArrived(true);
+			EventListener.onDisconnect();
 		} catch (MqttException e) {
+			EventListener.onDisconnect();
 		}
 	}
 
 	private boolean Checkname(String Topic) {
-        Pattern p = Pattern.compile("[^A-Za-z0-9_]");
-        if (!p.matcher(Topic).find() && !Topic.isEmpty()) {
-            return true;
-        } else {
-        	System.err.println("Error: name must be A-Z,a-z,0-9,_,& and must not spaces. ");
+		Pattern p = Pattern.compile("[^A-Za-z0-9_]");
+		if (!p.matcher(Topic).find() && !Topic.isEmpty()) {
+			return true;
+		} else {
+			System.err.println("Error: name must be A-Z,a-z,0-9,_,& and must not spaces. ");
 			System.exit(0);
 			return false;
-        }
-    }
+		}
+	}
 
-    private String Checktopic(String Topic) {
-        Pattern p = Pattern.compile("[^A-Za-z0-9/_]");
-        if (!p.matcher(Topic).find() && !Topic.isEmpty()) {
-            Pattern p1 = Pattern.compile("[\\._/]");
-            if(p1.matcher(Topic).find()){
-                return Topic.substring(1);
-            }
-            else{
-                return Topic;
-            }
-        } else {
-        	System.err.println("Error: name must be A-Z,a-z,0-9,_,& and must not spaces.");
+	private String Checktopic(String Topic) {
+		Pattern p = Pattern.compile("[^A-Za-z0-9/_]");
+		if (!p.matcher(Topic).find() && !Topic.isEmpty()) {
+			Pattern p1 = Pattern.compile("[\\._/]");
+			if (p1.matcher(Topic).find()) {
+				return Topic.substring(1);
+			} else {
+				return Topic;
+			}
+		} else {
+			System.err.println("Error: name must be A-Z,a-z,0-9,_,& and must not spaces.");
 			System.exit(0);
 			return null;
-        }
-    }
+		}
+	}
 
 	public void Publish(String Topic, String Message, boolean Retainde) {
-
 		try {
 			MqttMessage message = new MqttMessage();
+			message.setQos(qos);
 			message.setPayload(Message.getBytes());
-			if (Checktopic(Topic)!=null) {
+			if (Checktopic(Topic) != null) {
 				mqtt.publish("/" + appid + "/" + Checktopic(Topic), message.getPayload(), 0, Retainde);
 			}
 		} catch (MqttException e) {
@@ -429,11 +474,13 @@ public class Microgear implements MqttCallback {
 	public void Publish(String Topic, String Message) {
 		try {
 			MqttMessage message = new MqttMessage();
+			message.setQos(qos);
 			message.setPayload(Message.getBytes());
-			if (Checktopic(Topic)!=null) {
-				mqtt.publish("/" + appid + "/" + Checktopic(Topic), message);
+			if (Checktopic(Topic) != null) {
+				Publisher publisher = new Publisher(mqtt,"/" + appid + "/" + Checktopic(Topic),message);
+				Thread PublishThread =new Thread(publisher);  
+				PublishThread.start();  
 			}
-		} catch (MqttException e) {
 		} catch (NullPointerException e) {
 			if (status_vac) {
 				republish_topic.add("/" + appid + "/" + Checktopic(Topic));
@@ -444,8 +491,8 @@ public class Microgear implements MqttCallback {
 
 	public void Subscribe(String Topic) {
 		try {
-			if (Checktopic(Topic)!=null) {
-				
+			if (Checktopic(Topic) != null) {
+
 				mqtt.subscribe("/" + appid + "/" + Checktopic(Topic));
 				if (status_vac) {
 					vec_subscribe.add(Checktopic(Topic));
@@ -462,8 +509,8 @@ public class Microgear implements MqttCallback {
 
 	public void Unsubscribe(String Topic) {
 		try {
-			if (Checktopic(Topic)!=null) {
-				Microgear.mqtt.unsubscribe("/" + appid + "/" + Checktopic(Topic));
+			if (Checktopic(Topic) != null) {
+				mqtt.unsubscribe("/" + appid + "/" + Checktopic(Topic));
 				vec_subscribe.remove(Checktopic(Topic));
 			}
 		} catch (MqttException e) {
@@ -476,14 +523,16 @@ public class Microgear implements MqttCallback {
 
 		try {
 			MqttMessage message = new MqttMessage();
+			message.setQos(qos);
 			message.setPayload("".getBytes());
 			if (Checkname(Newalias)) {
-				mqtt.publish("/" + appid + "/@setalias/" + Newalias, message);
+				Publisher publisher = new Publisher(mqtt,"/" + appid + "/@setalias/" + Newalias,message);
+				Thread PublishThread =new Thread(publisher);  
+				PublishThread.start();  
 				if (status_vac) {// error=true save alias
 					vec_setalias = Newalias;
 				}
 			}
-		} catch (MqttException e) {
 		} catch (NullPointerException e) {
 			if (status_vac) {// error=true save alias
 				vec_setalias = Newalias;
@@ -495,18 +544,20 @@ public class Microgear implements MqttCallback {
 
 		try {
 			MqttMessage message = new MqttMessage();
+			message.setQos(qos);
 			message.setPayload(Message.getBytes());
 			if (Checkname(Name)) {
-				mqtt.publish("/" + appid + "/gearname/" + Name, message);
+				Publisher publisher = new Publisher(mqtt,"/" + appid + "/gearname/" + Name,message);
+				Thread PublishThread =new Thread(publisher);  
+				PublishThread.start(); 
 			}
-		} catch (MqttException e) {
 		} catch (NullPointerException e) {
 			if (status_vac) {
 				if (Checkname(Name)) {
 					republish_topic.add("/" + appid + "/gearname/");
 					republish_message.add(Message);
 				}
-				
+
 			}
 		}
 	}
@@ -523,67 +574,12 @@ public class Microgear implements MqttCallback {
 	@Override
 	public void messageArrived(String Topic, MqttMessage Message) {
 		if (Topic.indexOf("&present") != -1) {// receive client connect
-			PresentListener.OnPresentArrived(Message.toString());
-
+			EventListener.onPresent(Message.toString());
 		} else if (Topic.indexOf("&absent") != -1) {// receive client connect
-			AbsentListener.OnAbsentArrived(Message.toString());
+			EventListener.onAbsent(Message.toString());
 		} else {
-			MessageListener.OnMessageArrived(Topic, Message.toString());
+			EventListener.onMessage(Topic, Message.toString());
 		}
-	}
-
-	// Even OnConnect
-	public interface OnConnect {
-		void OnConnectArrived(Boolean c);
-	}
-
-	public void setConnectEvent(OnConnect ConnectEventListener) {
-		ConnectListener = ConnectEventListener;
-	}
-
-	// Even OnMessage
-	public interface OnMessage {
-		void OnMessageArrived(String Topic, String Message);
-	}
-
-	public void setMessageEvent(OnMessage MessageEventListener) {
-		MessageListener = MessageEventListener;
-	}
-
-	// Even OnDisconnect
-	public interface OnDisconnect {
-		void OnDisconnectArrived(Boolean d);
-	}
-
-	public void setDisconnectEvent(OnDisconnect OnDisconnectArrived) {
-		DisConnectListener = OnDisconnectArrived;
-	}
-
-	// Even OnError
-	public interface OnError {
-		void OnErrorArrived(String d);
-	}
-
-	public void setErrorEvent(OnError OnErrorArrived) {
-		ErrorListener = OnErrorArrived;
-	}
-
-	// Even OnPresent
-	public interface OnPresent {
-		void OnPresentArrived(String a);
-	}
-
-	public void setOnPresentEvent(OnPresent OnPresentArrived) {
-		PresentListener = OnPresentArrived;
-	}
-
-	// Even OnAbsent
-	public interface OnAbsent {
-		void OnAbsentArrived(String a);
-	}
-
-	public void setOnAbsentEvent(OnAbsent OnAbsentArrived) {
-		AbsentListener = OnAbsentArrived;
 	}
 
 	/**

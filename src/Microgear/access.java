@@ -1,4 +1,4 @@
-package Microgear;
+package microgear;
 
 import java.io.BufferedReader;
 import java.io.IOException;
