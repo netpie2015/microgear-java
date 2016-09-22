@@ -32,11 +32,10 @@ import org.eclipse.paho.client.mqttv3.MqttException;
 import org.eclipse.paho.client.mqttv3.MqttMessage;
 import org.eclipse.paho.client.mqttv3.MqttPersistenceException;
 import org.eclipse.paho.client.mqttv3.persist.MemoryPersistence;
-
 import org.json.JSONException;
 import org.json.JSONObject;
 
-import Decoder.BASE64Encoder;
+import sun.misc.*;
 
 public class Microgear implements MqttCallback {
 
