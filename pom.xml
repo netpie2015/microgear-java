@@ -1,14 +1,30 @@
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+                      https://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
   <groupId>io.netpie</groupId>
   <artifactId>microgear</artifactId>
   <version>0.0.1</version>
+  <url>http://github.com/netpieio/microgear-java</url>
   <licenses>
   <license>
    <name>ISC License (ISC)</name>
    <url>https://opensource.org/licenses/ISC</url>
   </license>
  </licenses>
+  <developers>
+    <developer>
+      <name>netpie</name>
+      <email>support@netpie.io</email>
+      <url>https://netpie.io</url>
+    </developer>
+  </developers>
+  <scm>
+  	<connection>scm:git:git://github.com/netpieio/microgear-java.git</connection>
+  	<developerConnection>scm:git:ssh://github.com:netpieio/microgear-java.git</developerConnection>
+  	<url>http://github.com/netpieio/microgear-java/tree/master</url>
+  </scm>
   <distributionManagement>
     <snapshotRepository>
       <id>ossrh</id>
