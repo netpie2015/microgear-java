@@ -335,7 +335,7 @@ public class Microgear implements MqttCallback {
 		status_vac = false;// set error for dont save subscribe
 		try {
 			new request().OAuth(key, secret, authorize_callback);
-			EventListener.onConnet();
+			EventListener.onConnect();
 		} catch (Exception e1) {
 		}
 
