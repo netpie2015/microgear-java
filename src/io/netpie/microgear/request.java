@@ -1,7 +1,6 @@
-package microgear;
+package io.netpie.microgear;
 
 import java.io.BufferedReader;
-import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
@@ -15,31 +14,30 @@ import java.util.Random;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 
-import org.json.JSONException;
 import org.json.JSONObject;
 
 import sun.misc.*;
 
-public class access {
+public class request {
 
-	final static String Method = "POST";
 	final static String version = "1.0";
-	final static String SignatureMethod = "HMAC-SHA1";
-	static final String Access_url = "http://ga.netpie.io:8080/api/atoken";
+	final static String Hmac = "HMAC-SHA1";
+	final static String Method = "POST";
+	final static String Request_url = "http://ga.netpie.io:8080/api/rtoken";
 	public JSONObject token_token_secret = new JSONObject();
-	final static String Verifier = "JVM1a";
+	//private EventListener eventListener = new EventListener();
 
-	public JSONObject OAuth(String Consumer_Key, String Consumer_Secret, String token, String Secret) throws Exception {
-		String Header = Sinature(Consumer_Key, Consumer_Secret, token, Secret);
-
+	public String OAuth(String Key, String Secret, String authorize_callback) throws Exception {
+		String Header = Sinature(Key, Secret, authorize_callback);
 		URL Url;
 		try {
-			Url = new URL(Access_url);
+			Url = new URL(Request_url);
 			URLConnection connect = Url.openConnection();
 			((HttpURLConnection) connect).setRequestMethod(Method);
 			connect.setDoOutput(true);
-			connect.setRequestProperty("Authorization", Header);
+			connect.setConnectTimeout(5000);
 			connect.setReadTimeout(5000);
+			connect.setRequestProperty("Authorization", Header);
 			OutputStreamWriter writer = new OutputStreamWriter(connect.getOutputStream());
 			writer.write(Header);
 			writer.flush();
@@ -52,26 +50,27 @@ public class access {
 				token_token_secret.put("", response);
 			}
 			rd.close();
-			return token_token_secret;
-		} catch (IOException e) {
-			e.printStackTrace();
-		} catch (JSONException e) {
-			e.printStackTrace();
+			Microgear.setStatus("0");
+			return token_token_secret.toString();
+		} catch (Exception e) {
+			//eventListener.mError.onError("Please check Appid,Key,Secret. ");
+			//Microgear.ErrorListener.OnErrorArrived("Please check Appid,Key,Secret. ");
+			System.exit(0);
 		}
-
-		return token_token_secret;
+		return null;
 	}
 
-	private static String Sinature(String Consumer_Key, String Consumer_Secret, String token, String Secret) {
+	public static String Sinature(String Key, String Secret, String authorize_callback) {
+		String key = Key;
+		String secret;
 		try {
-			Consumer_Secret = URLEncoder.encode(Consumer_Secret, "UTF-8");
-			Secret = URLEncoder.encode(Secret, "UTF-8");
+			secret = URLEncoder.encode(Secret, "UTF-8");
+			String callback = URLEncoder.encode(authorize_callback, "UTF-8");
 			String timestamp = Integer.toString((int) Math.floor((new Date()).getTime() / 1000));
 
-			String[] headers_key = { "oauth_consumer_key", "oauth_nonce", "oauth_signature_method", "oauth_timestamp",
-					"oauth_token", "oauth_verifier", "oauth_version", "oauth_signature" };
-			String[] headers_value = { Consumer_Key, _getNonce(), SignatureMethod, timestamp, token, Verifier, version,
-					"" };
+			String[] headers_key = new String[] { "oauth_callback", "oauth_consumer_key", "oauth_nonce",
+					"oauth_signature_method", "oauth_timestamp", "oauth_version", "oauth_signature" };
+			String[] headers_value = new String[] { callback, key, _getNonce(), Hmac, timestamp, version, "" };
 
 			String base = "";
 			for (int i = 0; i < headers_value.length - 1; i++) {
@@ -79,26 +78,25 @@ public class access {
 			}
 			base = base.substring(0, base.length() - 1);
 
-			String url = URLEncoder.encode(Access_url, "UTF-8");
+			String url = URLEncoder.encode(Request_url, "UTF-8");
 			String parameters = URLEncoder.encode(base, "UTF-8");
-			String signature = Method.toUpperCase() + "&" + url + "&" + parameters;
-			String key = Consumer_Secret + "&" + Secret;
+			String signatureBase = Method.toUpperCase() + "&" + url + "&" + parameters;
+			String tokenSecret = "";
+			String hkey = secret + "&" + tokenSecret;
 
-			SecretKeySpec keySpec = new SecretKeySpec(key.getBytes(), "HmacSHA1");
+			SecretKeySpec keySpec = new SecretKeySpec(hkey.getBytes(), "HmacSHA1");
 			Mac mac;
 			mac = Mac.getInstance("HmacSHA1");
 			mac.init(keySpec);
-
-			byte[] result = mac.doFinal(signature.getBytes());
+			byte[] result = mac.doFinal(signatureBase.getBytes());
 			BASE64Encoder encoder = new BASE64Encoder();
-			String hash = encoder.encode(result).toString();
-			headers_value[headers_value.length - 1] = hash;
-
+			String Hash = encoder.encode(result).toString();
+			headers_value[0] = authorize_callback;
+			headers_value[6] = Hash;
 			String authHeader = "OAuth ";
 			for (int i = 0; i < headers_value.length; i++) {
 				authHeader += URLEncoder.encode(headers_key[i], "UTF-8") + "=\""
 						+ URLEncoder.encode(headers_value[i], "UTF-8") + "\"" + ",";
-
 			}
 			authHeader = authHeader.substring(0, authHeader.length() - 1);
 			return authHeader;

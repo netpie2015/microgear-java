@@ -1,4 +1,4 @@
-package microgear;
+package io.netpie.microgear;
 
 public interface MicrogearEventListener {
 	public void onConnet();

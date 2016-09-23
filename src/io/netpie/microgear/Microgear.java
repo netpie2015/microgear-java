@@ -1,4 +1,4 @@
-package microgear;
+package io.netpie.microgear;
 
 import java.io.BufferedReader;
 import java.io.File;

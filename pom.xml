@@ -5,7 +5,7 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>io.netpie</groupId>
   <artifactId>microgear</artifactId>
-  <version>0.0.1</version>
+  <version>1.0.0</version>
   <url>http://github.com/netpieio/microgear-java</url>
   <licenses>
   <license>
@@ -95,6 +95,9 @@
       <groupId>org.apache.maven.plugins</groupId>
       <artifactId>maven-gpg-plugin</artifactId>
       <version>1.5</version>
+      <configuration>
+        <skip>true</skip>
+    </configuration>
       <executions>
         <execution>
           <id>sign-artifacts</id>
