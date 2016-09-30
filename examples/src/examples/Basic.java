@@ -14,8 +14,8 @@ public class Basic {
 	public static void main(String[] args) throws InterruptedException {
 		microgear = new Microgear();
 		callback = new callback();
-		microgear.setCallback(callback);
-		microgear.connect(appID, Key, Secret);
+		microgear.SetCallback(callback);
+		microgear.Connect(appID, Key, Secret);
 		microgear.Subscribe("/Topic");
 		int count = 1;
 		for(;;){

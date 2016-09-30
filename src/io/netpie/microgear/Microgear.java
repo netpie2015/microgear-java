@@ -13,10 +13,8 @@ import java.net.URL;
 import java.net.URLConnection;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
-import java.util.ArrayList;
 import java.util.Date;
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Vector;
 import java.util.regex.Pattern;
@@ -34,6 +32,7 @@ import org.eclipse.paho.client.mqttv3.MqttPersistenceException;
 import org.eclipse.paho.client.mqttv3.persist.MemoryPersistence;
 import org.json.JSONException;
 import org.json.JSONObject;
+
 
 import sun.misc.*;
 
@@ -58,8 +57,7 @@ public class Microgear implements MqttCallback {
 	private static String authorize_callback;
 	private static String Request_token;
 	private static Vector<String> vec_subscribe = new Vector<String>();
-	private static List<String> republish_topic = new ArrayList<String>();
-	private static List<String> republish_message = new ArrayList<String>();
+	private static Vector<Publish> vec_publish = new Vector<Publish>();
 	private static String vec_setalias;
 	private static String status = "0";
 
@@ -72,12 +70,39 @@ public class Microgear implements MqttCallback {
 	private int qos = 0;
 
 	private MicrogearEventListener EventListener;
+	private class Publish {
+		
+		String Topic;
+		String Message;
+		boolean Retainde = false;
+		public Publish(String Topic,String Message){
+			this.Topic = Topic;
+			this.Message = Message;
+		}
+		public Publish(String Topic,String Message,boolean Retainde){
+			this.Topic = Topic;
+			this.Message = Message;
+			this.Retainde = Retainde;
+		}
+		public String getTopic() {
+			return Topic;
+		}
+		public String getMessage() {
+			return Message;
+		}
+		
+		public boolean isRetainde() {
+			return Retainde;
+		}
+	}
 
 	private class Publisher extends Thread {
-		MqttClient mqtt ;
-		String Topic ;
-		MqttMessage Message ;
-		boolean Retainde = false;
+	
+		private String Topic = null;
+		private MqttMessage Message = null;
+		private boolean Retainde = false;
+		private MqttClient mqtt;
+
 		public void run(){  
 			if(Retainde){
 				try {
@@ -107,7 +132,7 @@ public class Microgear implements MqttCallback {
 			this.mqtt = mqtt;
 			this.Topic = topic;
 			this.Message = message;
-			this.Retainde = retainde; 
+			this.Retainde = retainde;
 		}
 		public Publisher(MqttClient mqtt,String topic,MqttMessage message){
 			this.mqtt = mqtt;
@@ -115,17 +140,17 @@ public class Microgear implements MqttCallback {
 			this.Message = message;
 		}
 	}
-
-	public void setCallback(MicrogearEventListener EventListener) {
+	
+	public void SetCallback(MicrogearEventListener EventListener) {
 		this.EventListener = EventListener;
 	}
 	
-	public void connect(String input_appID, String input_Key, String input_Secret, String alias) {
-		connect(input_appID,input_Key,input_Secret);
-		Setalias(alias);
+	public void Connect(String input_appID, String input_Key, String input_Secret, String alias) {
+		Connect(input_appID,input_Key,input_Secret);
+		SetAlias(alias);
 	}
 
-	public void connect(String input_appID, String input_Key, String input_Secret) {
+	public void Connect(String input_appID, String input_Key, String input_Secret) {
 		appid = input_appID;// save variables
 		key = input_Key;
 		secret = input_Secret;
@@ -227,6 +252,7 @@ public class Microgear implements MqttCallback {
 		}
 	}
 
+	@SuppressWarnings("restriction")
 	private String Signature(String access_token_secret, String access_token) {
 
 		String hkey = access_token_secret + "&" + secret;
@@ -283,6 +309,7 @@ public class Microgear implements MqttCallback {
 		return query_pairs;
 	}
 
+	@SuppressWarnings("restriction")
 	private void Connect_Broker() throws Exception {
 
 		String hkey = microgear_secret + "&" + secret;
@@ -340,24 +367,21 @@ public class Microgear implements MqttCallback {
 		}
 
 		if (vec_setalias != null) {
-			Setalias(vec_setalias);
+			SetAlias(vec_setalias);
 		}
 		for (int i = 0; i < vec_subscribe.size(); i++) {
 			Subscribe(vec_subscribe.get(i));
 		}
-		for (int i = 0; i < republish_topic.size(); i++) {
-			MqttMessage message = new MqttMessage();
-			message.setQos(qos);
-			message.setPayload(republish_message.get(i).getBytes());
-			if (Checktopic(republish_topic.get(i)) != null) {
-				Publisher publisher = new Publisher(mqtt,republish_topic.get(i),message);
-				Thread PublishThread =new Thread(publisher);  
-				PublishThread.start(); 
+		for (int i = 0; i < vec_publish.size(); i++) {
+			if(vec_publish.get(i).isRetainde()){
+				Publish(vec_publish.get(i).getTopic(),vec_publish.get(i).getMessage(),vec_publish.get(i).isRetainde());
 			}
-
+			else{
+				Publish(vec_publish.get(i).getTopic(),vec_publish.get(i).getMessage());
+			}
+			
 		}
-		republish_topic.removeAll(republish_topic);
-		republish_message.removeAll(republish_message);
+		vec_publish = new Vector<Publish>();
 		setStatus("0");// set status for connect
 		status_vac = true;// set error for save subscribe
 	}
@@ -368,7 +392,7 @@ public class Microgear implements MqttCallback {
 
 	void Reconnect() {
 		try {
-			connect(appid, key, secret);
+			Connect(appid, key, secret);
 		} catch (Exception e) {
 		}
 	}
@@ -459,12 +483,15 @@ public class Microgear implements MqttCallback {
 			message.setPayload(Message.getBytes());
 			if (Checktopic(Topic) != null) {
 				mqtt.publish("/" + appid + "/" + Checktopic(Topic), message.getPayload(), 0, Retainde);
+				Publisher publisher = new Publisher(mqtt,"/" + appid + "/" + Checktopic(Topic),message,Retainde);
+				Thread PublishThread =new Thread(publisher);  
+				PublishThread.start();  
 			}
-		} catch (MqttException e) {
+	} catch (MqttException e) {
 		} catch (NullPointerException e) {
 			if (status_vac) {
-				republish_topic.add("/" + appid + "/" + Checktopic(Topic));
-				republish_message.add(Message);
+				Publish publish = new Publish("/" + appid + "/" + Checktopic(Topic),Message,Retainde);
+				vec_publish.add(publish);
 			}
 
 		}
@@ -482,8 +509,8 @@ public class Microgear implements MqttCallback {
 			}
 		} catch (NullPointerException e) {
 			if (status_vac) {
-				republish_topic.add("/" + appid + "/" + Checktopic(Topic));
-				republish_message.add(Message);
+				Publish publish = new Publish("/" + appid + "/" + Checktopic(Topic),Message);
+				vec_publish.add(publish);
 			}
 		}
 	}
@@ -518,7 +545,7 @@ public class Microgear implements MqttCallback {
 		}
 	}
 
-	public void Setalias(String Newalias) {
+	public void SetAlias(String Newalias) {
 
 		try {
 			MqttMessage message = new MqttMessage();
@@ -553,8 +580,8 @@ public class Microgear implements MqttCallback {
 		} catch (NullPointerException e) {
 			if (status_vac) {
 				if (Checkname(Name)) {
-					republish_topic.add("/" + appid + "/gearname/");
-					republish_message.add(Message);
+					Publish publish = new Publish("/" + appid + "/gearname/" + Name,Message);
+					vec_publish.add(publish);
 				}
 
 			}
