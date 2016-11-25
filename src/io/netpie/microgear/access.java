@@ -33,25 +33,31 @@ public class access {
 		String Header = Sinature(Consumer_Key, Consumer_Secret, token, Secret);
 
 		URL Url;
-		try {
+		try {		
 			Url = new URL(Access_url);
-			URLConnection connect = Url.openConnection();
-			((HttpURLConnection) connect).setRequestMethod(Method);
-			connect.setDoOutput(true);
-			connect.setRequestProperty("Authorization", Header);
-			connect.setReadTimeout(5000);
-			OutputStreamWriter writer = new OutputStreamWriter(connect.getOutputStream());
-			writer.write(Header);
-			writer.flush();
-			InputStream is = connect.getInputStream();
-			BufferedReader rd = new BufferedReader(new InputStreamReader(is));
-			StringBuilder response = new StringBuilder();
-			String line;
-			while ((line = rd.readLine()) != null) {
-				response.append(line);
-				token_token_secret.put("", response);
+			URLConnection conn = Url.openConnection();
+			((HttpURLConnection) conn).setRequestMethod("POST");
+			conn.setDoOutput(true);
+			conn.setRequestProperty("Authorization", Header);
+			conn.connect();
+			int status = ((HttpURLConnection) conn).getResponseCode();
+
+			if(status >= HttpURLConnection.HTTP_BAD_REQUEST) {
+				//Log.i(getClass().getCanonicalName(),"Error HTTP Code "+status);
+
 			}
-			rd.close();
+
+			if(status== HttpURLConnection.HTTP_OK) {
+				InputStream is = conn.getInputStream();
+				BufferedReader rd = new BufferedReader(new InputStreamReader(is));
+				StringBuilder response = new StringBuilder();
+				String line;
+				while ((line = rd.readLine()) != null) {
+					response.append(line);
+					token_token_secret.put("", response);
+				}
+				rd.close();
+			}
 			return token_token_secret;
 		} catch (IOException e) {
 			e.printStackTrace();

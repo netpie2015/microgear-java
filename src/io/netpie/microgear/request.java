@@ -1,6 +1,7 @@
 package io.netpie.microgear;
 
 import java.io.BufferedReader;
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
@@ -14,6 +15,7 @@ import java.util.Random;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 
+import org.json.JSONException;
 import org.json.JSONObject;
 
 import sun.misc.*;
@@ -25,37 +27,42 @@ public class request {
 	final static String Method = "POST";
 	final static String Request_url = "http://ga.netpie.io:8080/api/rtoken";
 	public JSONObject token_token_secret = new JSONObject();
-	//private EventListener eventListener = new EventListener();
 
 	public String OAuth(String Key, String Secret, String authorize_callback) throws Exception {
 		String Header = Sinature(Key, Secret, authorize_callback);
 		URL Url;
-		try {
+		try {	
 			Url = new URL(Request_url);
-			URLConnection connect = Url.openConnection();
-			((HttpURLConnection) connect).setRequestMethod(Method);
-			connect.setDoOutput(true);
-			connect.setConnectTimeout(5000);
-			connect.setReadTimeout(5000);
-			connect.setRequestProperty("Authorization", Header);
-			OutputStreamWriter writer = new OutputStreamWriter(connect.getOutputStream());
-			writer.write(Header);
-			writer.flush();
-			InputStream is = connect.getInputStream();
-			BufferedReader rd = new BufferedReader(new InputStreamReader(is));
-			StringBuilder response = new StringBuilder();
-			String line;
-			while ((line = rd.readLine()) != null) {
-				response.append(line);
-				token_token_secret.put("", response);
-			}
-			rd.close();
-			Microgear.setStatus("0");
-			return token_token_secret.toString();
-		} catch (Exception e) {
-			//eventListener.mError.onError("Please check Appid,Key,Secret. ");
-			//Microgear.ErrorListener.OnErrorArrived("Please check Appid,Key,Secret. ");
-			System.exit(0);
+            URLConnection conn = Url.openConnection();
+            conn.setReadTimeout(3000);
+            ((HttpURLConnection) conn).setRequestMethod("POST");
+            conn.setDoOutput(true);
+            conn.setRequestProperty("Authorization", Header);
+            conn.connect();
+            
+            int status = ((HttpURLConnection) conn).getResponseCode();
+
+            if(status >= HttpURLConnection.HTTP_BAD_REQUEST) {
+            }
+
+            if(status== HttpURLConnection.HTTP_OK) {
+                InputStream is = conn.getInputStream();
+                BufferedReader rd = new BufferedReader(new InputStreamReader(is));
+                StringBuilder response = new StringBuilder();
+                String line;
+                while ((line = rd.readLine()) != null) {
+                    response.append(line);
+                    token_token_secret.put("", response);
+                }
+                rd.close();
+                Microgear.setStatus("0");
+    			return token_token_secret.toString();
+
+            }
+		}  catch (IOException e) {
+			e.printStackTrace();
+		} catch (JSONException e) {
+			e.printStackTrace();
 		}
 		return null;
 	}
