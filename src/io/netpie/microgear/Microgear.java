@@ -14,6 +14,7 @@ import java.net.URLConnection;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
 import java.util.Date;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Vector;
@@ -60,11 +61,9 @@ public class Microgear implements MqttCallback {
 	private static Vector<Publish> vec_publish = new Vector<Publish>();
 	private static String vec_setalias;
 	private static String status = "0";
-
 	private final String broker = "tcp://gb.netpie.io:1883";
 	private final String resettoken_url = "http://ga.netpie.io:8080/api/revoke/";
 	private final String endpoint = "pie://gb.netpie.io:1883";
-	private final String dir = "src/microgear.cache";
 
 	private boolean status_vac = true;
 	private int qos = 0;
@@ -141,6 +140,29 @@ public class Microgear implements MqttCallback {
 		}
 	}
 	
+	public void writeFeed(String feedid,JSONObject  data) {
+        String feedTopic="/@writefeed/"+feedid;
+        Iterator<String> iter = data.keys();
+        String stringData = "{";
+        while (iter.hasNext()) {
+            String key = iter.next();
+            stringData += "\""+key+"\"";
+            try {
+                Object value = data.get(key);
+                stringData += ":"+value+",";
+            } catch (JSONException e) {
+                // Something went wrong!
+            }
+        }
+        stringData = stringData.substring(0, stringData.length()-1);
+        stringData += "}";
+        Publish(feedTopic,stringData);
+    }
+
+    public void writeFeed(String feedid,JSONObject  data,String feedkey) {
+        this.writeFeed(feedid+"/"+feedkey,data);
+    }
+	
 	public void SetCallback(MicrogearEventListener EventListener) {
 		this.EventListener = EventListener;
 	}
@@ -164,7 +186,7 @@ public class Microgear implements MqttCallback {
 		String line;
 		FileInputStream fis;
 		try {
-			fis = new FileInputStream(dir);
+			fis = new FileInputStream("microgear-"+key+".cache");
 			bufferedReader = new BufferedReader(new InputStreamReader(fis));
 			while ((line = bufferedReader.readLine()) != null) {
 				sb.append(line);
@@ -175,7 +197,6 @@ public class Microgear implements MqttCallback {
 			microgear_secret = cache_microgear.getJSONObject("_").getJSONObject("accesstoken").getString("secret");
 			microgear_revokecode = cache_microgear.getJSONObject("_").getJSONObject("accesstoken")
 					.getString("revokecode");
-
 			Check();// exist microgear
 		} catch (FileNotFoundException e) {
 			Build_microgear();// none microgear
@@ -239,7 +260,7 @@ public class Microgear implements MqttCallback {
 			// send to method for encryption
 			String revokecode = Signature(access_token_secret, access_token);
 
-			File checkfile = new File(dir);// check microgear.cache
+			File checkfile = new File("microgear-"+key+".cache");// check microgear.cache
 			if (checkfile.exists()) {// Exist microgear.cache
 				checkfile.setWritable(true);// set read only false
 
@@ -361,7 +382,7 @@ public class Microgear implements MqttCallback {
 	private void Resubscribe() {
 		status_vac = false;// set error for dont save subscribe
 		try {
-			new request().OAuth(key, secret, authorize_callback);
+//			new request().OAuth(key, secret, authorize_callback);
 			EventListener.onConnect();
 		} catch (Exception e1) {
 		}
@@ -410,11 +431,11 @@ public class Microgear implements MqttCallback {
 			add_microgear1.put("accesstoken", add_microgear2);
 			microgear.put("_", add_microgear1);
 
-			FileWriter write = new FileWriter(dir, false);
+			FileWriter write = new FileWriter("microgear-"+key+".cache", false);
 			write.write(microgear.toString());
 			write.flush();
 			write.close();
-			File checkfile = new File(dir);// set file read only
+			File checkfile = new File("microgear-"+key+".cache");// set file read only
 			checkfile.setWritable(false);
 
 		} catch (JSONException e) {
@@ -461,7 +482,7 @@ public class Microgear implements MqttCallback {
 	}
 
 	private String Checktopic(String Topic) {
-		Pattern p = Pattern.compile("[^A-Za-z0-9/_]");
+		Pattern p = Pattern.compile("[^A-Za-z0-9/_#+@]");
 		if (!p.matcher(Topic).find() && !Topic.isEmpty()) {
 			Pattern p1 = Pattern.compile("[\\._/]");
 			if (p1.matcher(Topic).find()) {
@@ -470,7 +491,7 @@ public class Microgear implements MqttCallback {
 				return Topic;
 			}
 		} else {
-			System.err.println("Error: name must be A-Z,a-z,0-9,_,& and must not spaces.");
+			System.err.println("Error: name must be A-Z,a-z,0-9,_,&,#,+ and must not spaces.");
 			System.exit(0);
 			return null;
 		}
@@ -601,9 +622,17 @@ public class Microgear implements MqttCallback {
 	public void messageArrived(String Topic, MqttMessage Message) {
 		if (Topic.indexOf("&present") != -1) {// receive client connect
 			EventListener.onPresent(Message.toString());
-		} else if (Topic.indexOf("&absent") != -1) {// receive client connect
+		} 
+		else if (Topic.indexOf("&absent") != -1) {// receive client connect
 			EventListener.onAbsent(Message.toString());
-		} else {
+		} 
+		else if (Topic.indexOf("@error") != -1) {
+			EventListener.onError(Message.toString());
+        }
+		else if (Topic.indexOf("@info") != -1) {
+        	EventListener.onInfo(Message.toString());
+        }
+		else {
 			EventListener.onMessage(Topic, Message.toString());
 		}
 	}
